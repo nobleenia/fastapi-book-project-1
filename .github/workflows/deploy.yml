@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v3
 
     - name: SSH into EC2 and Deploy
@@ -19,17 +19,40 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
-        timeout: "120s"
+        timeout: "180s"
         script: |
+          echo "🚀 Starting Deployment"
+
+          # Change to project directory or clone if missing
+          if [ ! -d "fastapi-book-project-1" ]; then
+            git clone https://github.com/nobleenia/fastapi-book-project-1.git
+          fi
           cd fastapi-book-project-1 || exit 1
+
+          # Pull latest changes
           git pull origin main
+
+          # Create and activate virtual environment
           if [ ! -d "venv" ]; then
+            sudo apt-get update
+            sudo apt-get install -y python3-venv
             python3 -m venv venv
           fi
           source venv/bin/activate
+
+          # Install pip if missing
           if ! command -v pip &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y python3-pip
+            sudo apt-get update
+            sudo apt-get install -y python3-pip
           fi
+
+          # Install dependencies
+          pip install --upgrade pip
           pip install -r requirements.txt
-          sudo systemctl restart fastapi || echo "fastapi service not found"
-          sudo systemctl restart nginx || echo "nginx service not found"
+
+          # Restart services
+          sudo systemctl daemon-reload
+          sudo systemctl restart fastapi || echo "⚠️ fastapi service restart failed"
+          sudo systemctl restart nginx || echo "⚠️ nginx service restart failed"
+
+          echo "✅ Deployment Completed"
